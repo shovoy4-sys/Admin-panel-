@@ -21,22 +21,35 @@
         </header>
         
         <!-- Admin Login with Google -->
-        <div id="admin-login" class="bg-white p-8 rounded-lg shadow-md max-w-md mx-auto text-center mt-20">
-             <div class="bg-indigo-100 text-indigo-600 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 text-4xl">
-                 <i class="fas fa-lock"></i>
-             </div>
-             <h2 class="text-2xl font-bold mb-4 text-gray-800">Admin Login</h2>
-             <p class="text-gray-500 mb-8 text-sm">Jaari rakhne ke liye kripya apne authorized Google account se sign in karein.</p>
-             <button id="google-login-btn" class="bg-white border border-gray-300 text-gray-700 font-semibold py-3 px-6 rounded-lg shadow-sm hover:bg-gray-50 transition duration-300 flex items-center justify-center w-full">
-                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google icon" class="w-6 h-6 mr-3">
-                Google Se Sign in Karein
-             </button>
-        </div>
-
-        <!-- Access Denied Message -->
-        <div id="access-denied" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative max-w-md mx-auto text-center mt-10" role="alert">
-            <strong class="font-bold block mb-1 text-lg"><i class="fas fa-ban"></i> Access Denied!</strong>
-            <span class="block sm:inline">Yeh Google account admin panel ke liye authorized nahi hai.</span>
+        <div id="admin-login" class="bg-white p-8 rounded-lg shadow-md max-w-md mx-auto mt-20">
+            <div class="bg-indigo-100 text-indigo-600 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 text-4xl">
+                <i class="fas fa-lock"></i>
+            </div>
+            <h2 class="text-2xl font-bold mb-1 text-gray-800 text-center">Admin Login</h2>
+            <p class="text-gray-400 text-sm text-center mb-6">Email &amp; Password diye sign in karein</p>
+            <div class="space-y-4">
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-3 flex items-center text-gray-400"><i class="fas fa-envelope"></i></span>
+                    <input id="login-email" type="email" placeholder="Email Address" autocomplete="email"
+                        class="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-gray-50 text-sm">
+                </div>
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-3 flex items-center text-gray-400"><i class="fas fa-key"></i></span>
+                    <input id="login-password" type="password" placeholder="Password" autocomplete="current-password"
+                        class="w-full pl-10 pr-10 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-gray-50 text-sm">
+                    <button type="button" id="toggle-password" class="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-eye" id="eye-icon"></i>
+                    </button>
+                </div>
+                <div id="login-error-msg" class="hidden bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg px-4 py-3 flex items-start gap-2">
+                    <i class="fas fa-exclamation-circle mt-0.5 shrink-0"></i>
+                    <span id="login-error-text"></span>
+                </div>
+                <button id="email-login-btn"
+                    class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-md">
+                    <i class="fas fa-sign-in-alt"></i> Sign In
+                </button>
+            </div>
         </div>
 
         <!-- Admin Content Management (Hidden by default) -->
@@ -280,9 +293,8 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
         import { getFirestore, collection, addDoc, getDocs, doc, deleteDoc, serverTimestamp, query, orderBy, setDoc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-        import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-        // Firebase config ko User App ke hisaab se update kar diya gaya hai
         const firebaseConfig = {
             apiKey: "AIzaSyA2Iu47JLN5NI3y_O9DHDwVFGyGMka_ODw",
             authDomain: "file-download-e49b6.firebaseapp.com",
@@ -291,39 +303,112 @@
             messagingSenderId: "953816201925",
             appId: "1:953816201925:web:283e1758045a4f11ec0eac"
         };
-        
-        const authorizedAdmins = ['emon219298@gmail.com'];
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const auth = getAuth(app);
-        const provider = new GoogleAuthProvider();
 
-        const adminLogin = document.getElementById('admin-login');
+        // ✅ শুধু এই UID-এর user admin panel access পাবে
+        const ADMIN_UID = '9D8dvSQuvfMLyifpSL3xJhUXyMG3';
+
+        const adminLogin  = document.getElementById('admin-login');
         const adminContent = document.getElementById('admin-content');
-        const googleLoginBtn = document.getElementById('google-login-btn');
-        const signOutBtn = document.getElementById('sign-out-btn');
-        const accessDenied = document.getElementById('access-denied');
-        const fileList = document.getElementById('file-list');
-        const sliderList = document.getElementById('slider-list');
-        const editModal = document.getElementById('edit-file-modal');
+        const signOutBtn  = document.getElementById('sign-out-btn');
+        const fileList    = document.getElementById('file-list');
+        const sliderList  = document.getElementById('slider-list');
+        const editModal   = document.getElementById('edit-file-modal');
 
+        // --- Error helpers ---
+        function showLoginError(msg) {
+            const errEl  = document.getElementById('login-error-msg');
+            const errTxt = document.getElementById('login-error-text');
+            if (errTxt) errTxt.textContent = msg;
+            if (errEl)  errEl.classList.remove('hidden');
+        }
+        function hideLoginError() {
+            const errEl = document.getElementById('login-error-msg');
+            if (errEl) errEl.classList.add('hidden');
+        }
+
+        // --- Auth state watcher (UID check) ---
         onAuthStateChanged(auth, (user) => {
-            if (user && authorizedAdmins.includes(user.email)) {
+            if (user && user.uid === ADMIN_UID) {
+                // ✅ Authorized admin
                 adminLogin.classList.add('hidden');
-                accessDenied.classList.add('hidden');
                 adminContent.classList.remove('hidden');
                 signOutBtn.classList.remove('hidden');
+                hideLoginError();
                 loadAdminData();
-            } else {
+            } else if (user && user.uid !== ADMIN_UID) {
+                // ❌ Logged in but wrong UID → auto sign out
+                signOut(auth);
+                showLoginError('❌ Aap authorized admin nahi hain.');
                 adminLogin.classList.remove('hidden');
                 adminContent.classList.add('hidden');
                 signOutBtn.classList.add('hidden');
-                if (user) accessDenied.classList.remove('hidden');
+            } else {
+                // Not logged in
+                adminLogin.classList.remove('hidden');
+                adminContent.classList.add('hidden');
+                signOutBtn.classList.add('hidden');
             }
         });
 
-        googleLoginBtn.addEventListener('click', () => signInWithPopup(auth, provider));
+        // --- Email/Password Login ---
+        const emailLoginBtn = document.getElementById('email-login-btn');
+        const loginEmailEl  = document.getElementById('login-email');
+        const loginPassEl   = document.getElementById('login-password');
+
+        // Enter key support
+        [loginEmailEl, loginPassEl].forEach(el => {
+            el && el.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') emailLoginBtn.click();
+            });
+        });
+
+        // Show/hide password toggle
+        document.getElementById('toggle-password')?.addEventListener('click', () => {
+            const isPass = loginPassEl.type === 'password';
+            loginPassEl.type = isPass ? 'text' : 'password';
+            document.getElementById('eye-icon').className = isPass ? 'fas fa-eye-slash' : 'fas fa-eye';
+        });
+
+        emailLoginBtn.addEventListener('click', async () => {
+            const email    = loginEmailEl.value.trim();
+            const password = loginPassEl.value;
+            hideLoginError();
+
+            if (!email || !password) {
+                return showLoginError('Email aur Password dono zaroori hain.');
+            }
+
+            // Loading state
+            emailLoginBtn.disabled = true;
+            emailLoginBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Signing in...';
+
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                // onAuthStateChanged will handle UI update
+            } catch (error) {
+                let msg = 'Login failed. Try again.';
+                if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') {
+                    msg = '❌ Email ya Password galat hai.';
+                } else if (error.code === 'auth/invalid-email') {
+                    msg = '❌ Email format sahi nahi hai.';
+                } else if (error.code === 'auth/too-many-requests') {
+                    msg = '⚠️ Bahut zyada attempts. Kuch der baad try karein.';
+                } else if (error.code === 'auth/network-request-failed') {
+                    msg = '⚠️ Network error. Internet connection check karein.';
+                } else {
+                    msg = '❌ Error: ' + (error.message || error.code);
+                }
+                showLoginError(msg);
+            } finally {
+                emailLoginBtn.disabled = false;
+                emailLoginBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In';
+            }
+        });
+
         signOutBtn.addEventListener('click', () => signOut(auth));
 
         // Toast System
